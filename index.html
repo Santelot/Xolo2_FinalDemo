@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xolo AI - Asistente de Programación</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* ========================================
+           MODAL DE INICIO
+        ======================================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-overlay.hidden { display: none; }
+
+        .modal {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            max-width: 480px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .modal-header h2 {
+            color: #1a1a2e;
+            font-size: 1.4rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .modal-header p {
+            color: #666;
+            font-size: 0.85rem;
+        }
+
+        .section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #667eea;
+            margin: 1rem 0 0.5rem 0;
+            padding-top: 0.75rem;
+            border-top: 1px solid #eee;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .section-title:first-of-type {
+            border-top: none;
+            margin-top: 0.5rem;
+        }
+
+        .modal label {
+            display: block;
+            font-size: 0.8rem;
+            color: #555;
+            margin-bottom: 0.25rem;
+            font-weight: 500;
+        }
+
+        .modal label small {
+            color: #999;
+            font-weight: normal;
+        }
+
+        .modal input, .modal textarea, .modal select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-bottom: 0.6rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .modal textarea {
+            resize: vertical;
+            min-height: 50px;
+        }
+
+        .modal input:focus, .modal textarea:focus, .modal select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* Identity Selector en Modal */
+        .identity-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+            margin-bottom: 0.6rem;
+        }
+
+        .identity-option {
+            padding: 8px 4px;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.2s;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .identity-option:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+        }
+
+        .identity-option.selected {
+            border-color: #333;
+            box-shadow: 0 0 0 2px white, 0 3px 10px rgba(0,0,0,0.3);
+        }
+
+        /* Checkbox nuevo estudiante */
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: #f0f4ff;
+            border-radius: 6px;
+            margin-bottom: 0.6rem;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            accent-color: #667eea;
+        }
+
+        .checkbox-row label {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #333;
+        }
+
+        .modal .btn-start {
+            width: 100%;
+            padding: 0.875rem 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 0.75rem;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+
+        .modal .btn-start:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+        }
+
+        .modal .btn-start:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ========================================
+           LAYOUT PRINCIPAL
+        ======================================== */
+        .app-container {
+            display: none;
+            flex: 1;
+            height: 100vh;
+            transition: background 0.3s ease;
+        }
+
+        .app-container.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 60px;
+            padding: 2rem;
+        }
+
+        /* Logo Section */
+        .logo-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .logo-section img {
+            max-width: 280px;
+            height: auto;
+            filter: drop-shadow(0 10px 30px rgba(0,0,0,0.3));
+            animation: fadeIn 1s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Chat Section */
+        .chat-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #chat-container {
+            width: 400px;
+            height: calc(100vh - 4rem);
+            max-height: 700px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+            background: white;
+        }
+
+        /* ========================================
+           FULLSCREEN MODAL
+        ======================================== */
+        .fullscreen-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.95);
+            z-index: 99999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .fullscreen-modal.active { display: flex; }
+
+        .fullscreen-modal img {
+            max-width: 95%;
+            max-height: 85vh;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 0 50px rgba(255,255,255,0.1);
+        }
+
+        .fullscreen-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: white;
+            cursor: pointer;
+            background: none;
+            border: none;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .fullscreen-close:hover { opacity: 1; }
+
+        .fullscreen-hint {
+            color: rgba(255,255,255,0.6);
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        /* Hidden renderer */
+        #makecode-renderer { 
+            position: absolute; 
+            left: -9999px; 
+            width: 1px; 
+            height: 1px; 
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .app-container.active {
+                flex-direction: column;
+                gap: 30px;
+                padding: 1.5rem;
+            }
+            
+            .logo-section img {
+                max-width: 180px;
+            }
+            
+            #chat-container {
+                width: 100%;
+                max-width: 400px;
+                height: calc(100vh - 280px);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .identity-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .logo-section img {
+                max-width: 140px;
+            }
+            
+            .app-container.active {
+                gap: 20px;
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ========================================
+         MODAL DE INICIO
+    ======================================== -->
+    <div class="modal-overlay" id="startModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🐕 Xolo AI</h2>
+                <p>Configura tu sesión de aprendizaje</p>
+            </div>
+
+            <div class="section-title">🎨 Elige tu Xolo</div>
+            <div class="identity-grid" id="identityGrid"></div>
+
+            <div class="section-title">📌 Identificación</div>
+            <label>ID de Sesión <small>(requerido)</small></label>
+            <input type="text" id="userIdInput" placeholder="Ej: estudiante_001" autocomplete="off">
+
+            <div class="section-title">👤 Perfil del Estudiante</div>
+            
+            <div class="checkbox-row">
+                <input type="checkbox" id="studentNew" checked>
+                <label for="studentNew">Primera vez (el chatbot preguntará mi info)</label>
+            </div>
+            
+            <label>Apodo <small>- Cómo te llaman</small></label>
+            <input type="text" id="studentNickname" placeholder="Ej: Santi">
+
+            <label>Intereses <small>- Qué te gusta</small></label>
+            <textarea id="studentInterests" placeholder="Ej: videojuegos, robots, música"></textarea>
+
+            <label>Estilo de aprendizaje <small>- Cómo aprendes mejor</small></label>
+            <textarea id="studentLearning" placeholder="Ej: visual, con ejemplos prácticos"></textarea>
+
+            <label>Motivación <small>- Qué te motiva</small></label>
+            <textarea id="studentGamification" placeholder="Ej: retos, competencias, logros"></textarea>
+
+            <div class="section-title">📚 Configuración de Clase</div>
+            
+            <label>Objetivo <small>- Qué aprenderás hoy</small></label>
+            <textarea id="classObjective" placeholder="Ej: Programar un semáforo con micro:bit"></textarea>
+
+            <label>Contenido <small>- Tema específico</small></label>
+            <textarea id="classPrompt" placeholder="Ej: Uso de LEDs y delays"></textarea>
+
+            <label>Ruta <small>- Pasos de la sesión</small></label>
+            <textarea id="classPath" placeholder="Ej: Intro → Demo → Práctica → Reto"></textarea>
+
+            <button class="btn-start" id="btnStart" disabled>🚀 Comenzar Sesión</button>
+        </div>
+    </div>
+
+    <!-- ========================================
+         APLICACIÓN PRINCIPAL
+    ======================================== -->
+    <div class="app-container" id="appContainer">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <img src="https://raw.githubusercontent.com/Gnius-Club/Xolo_2_Images_Databank/refs/heads/main/Xolo_2_Branding/XOLO_2.0_LOGO_W.png" alt="Xolo AI Logo">
+        </div>
+
+        <!-- Chat Section -->
+        <div class="chat-section">
+            <div id="chat-container"></div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         FULLSCREEN MODAL
+    ======================================== -->
+    <div class="fullscreen-modal" id="fullscreenModal">
+        <button class="fullscreen-close" onclick="closeFullscreen()">&times;</button>
+        <img id="fullscreenImg" src="" alt="Bloques MakeCode">
+        <p class="fullscreen-hint">ESC o × para cerrar</p>
+    </div>
+
+    <!-- MakeCode Renderer Container -->
+    <div id="makecode-renderer-container"></div>
+
+    <script>
+        // ========================================
+        // CONFIGURACIÓN
+        // ========================================
+        const VOICEFLOW_PROJECT_ID = '6939acf1a9d88d0b36fcdacf';
+        const MAKECODE_URL = 'https://makecode.microbit.org/';
+
+        // ========================================
+        // IDENTIDADES XOLO AI
+        // ========================================
+        const xoloIdentities = [
+            { id: 'xolo3', name: 'Xolo 3', gradient: ['#0000ff', '#00ffff'], solidColor: '#0080ff', userBubbleText: '#ffffff' },
+            { id: 'xolo4', name: 'Xolo 4', gradient: ['#0065a8', '#00ff66'], solidColor: '#00ffbf', userBubbleText: '#0f172a' },
+            { id: 'xolo5', name: 'Xolo 5', gradient: ['#007bff', '#33ff00'], solidColor: '#00ff4c', userBubbleText: '#0f172a' },
+            { id: 'xolo6', name: 'Xolo 6', gradient: ['#00991f', '#ccff00'], solidColor: '#4dff00', userBubbleText: '#0f172a' },
+            { id: 'xolo7', name: 'Xolo 7', gradient: ['#ff0022', '#9900ff'], solidColor: '#cc008b', userBubbleText: '#ffffff' },
+            { id: 'xolo8', name: 'Xolo 8', gradient: ['#ff7700', '#ff00cc'], solidColor: '#ff3c64', userBubbleText: '#ffffff' },
+            { id: 'xolo9', name: 'Xolo 9', gradient: ['#ffae00', '#ff0033'], solidColor: '#ff5619', userBubbleText: '#ffffff' },
+            { id: 'xolo10', name: 'Xolo 10', gradient: ['#003380', '#b300ff'], solidColor: '#1300bd', userBubbleText: '#ffffff' },
+            { id: 'xolo11', name: 'Xolo 11', gradient: ['#1e0080', '#ff00cc'], solidColor: '#8400bd', userBubbleText: '#ffffff' },
+            { id: 'xolo12', name: 'Xolo 12', gradient: ['#660080', '#ff0033'], solidColor: '#bd0084', userBubbleText: '#ffffff' }
+        ];
+
+        // ========================================
+        // EXTENSIONES MAKECODE (todas activas por defecto)
+        // ========================================
+        const makeCodeExtensions = [
+            { id: 'cutebot', name: 'Cutebot', package: 'cutebot=github:elecfreaks/pxt-cutebot', namespace: 'cutebot' },
+            { id: 'nezha2', name: 'Nezha V2', package: 'nezha2=github:elecfreaks/pxt-nezha2', namespace: 'NEZHA_V2' },
+            { id: 'planetx', name: 'Planet X', package: 'PlanetX=github:elecfreaks/pxt-PlanetX', namespace: 'PlanetX' },
+            { id: 'xgo', name: 'XGO', package: 'XGO=github:elecfreaks/pxt-xgo', namespace: 'xgo' },
+            { id: 'iot-environment', name: 'IoT Environment', package: 'iot-environment-kit=github:tinkertanker/pxt-iot-environment-kit', namespace: 'Environment_IoT' }
+        ];
+
+        // ========================================
+        // ESTADO
+        // ========================================
+        let currentIdentity = xoloIdentities[0];
+        let lastCSS = '';
+        let scriptLoaded = false;
+
+        // ========================================
+        // ELEMENTOS DOM
+        // ========================================
+        const startModal = document.getElementById('startModal');
+        const appContainer = document.getElementById('appContainer');
+        const userIdInput = document.getElementById('userIdInput');
+        const btnStart = document.getElementById('btnStart');
+
+        // ========================================
+        // INICIALIZAR GRID DE IDENTIDADES
+        // ========================================
+        function initIdentityGrid() {
+            const grid = document.getElementById('identityGrid');
+            grid.innerHTML = '';
+            
+            xoloIdentities.forEach((identity, index) => {
+                const option = document.createElement('div');
+                option.className = 'identity-option' + (index === 0 ? ' selected' : '');
+                option.style.background = `linear-gradient(135deg, ${identity.gradient[0]}, ${identity.gradient[1]})`;
+                option.textContent = identity.name.replace('Xolo ', '');
+                option.onclick = () => selectIdentity(identity, option);
+                grid.appendChild(option);
+            });
+        }
+
+        function selectIdentity(identity, element) {
+            currentIdentity = identity;
+            document.querySelectorAll('.identity-option').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+        }
+
+        // ========================================
+        // VALIDACIÓN
+        // ========================================
+        userIdInput.addEventListener('input', () => {
+            btnStart.disabled = userIdInput.value.trim() === '';
+        });
+
+        userIdInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && userIdInput.value.trim() !== '') {
+                startSession();
+            }
+        });
+
+        btnStart.addEventListener('click', startSession);
+
+        // ========================================
+        // INICIAR SESIÓN
+        // ========================================
+        function startSession() {
+            const userId = userIdInput.value.trim();
+            
+            // Recopilar variables
+            const variables = {
+                student_new: document.getElementById('studentNew').checked,
+                student_nickname: document.getElementById('studentNickname').value.trim(),
+                student_interests: document.getElementById('studentInterests').value.trim(),
+                student_learning: document.getElementById('studentLearning').value.trim(),
+                student_gamification: document.getElementById('studentGamification').value.trim(),
+                class_objective: document.getElementById('classObjective').value.trim(),
+                class_prompt: document.getElementById('classPrompt').value.trim(),
+                class_path: document.getElementById('classPath').value.trim()
+            };
+
+            console.log('🚀 Iniciando sesión:', userId);
+            console.log('📋 Variables:', variables);
+
+            // Actualizar UI
+            startModal.classList.add('hidden');
+            appContainer.classList.add('active');
+
+            // Aplicar colores de identidad al fondo
+            applyIdentityColors();
+
+            // Iniciar VoiceFlow
+            initVoiceflow(userId, variables);
+        }
+
+        // ========================================
+        // APLICAR COLORES DE IDENTIDAD
+        // ========================================
+        function applyIdentityColors() {
+            const gradient = `linear-gradient(135deg, ${currentIdentity.gradient[0]}, ${currentIdentity.gradient[1]})`;
+            appContainer.style.background = gradient;
+            generateAndApplyCSS();
+        }
+
+        // ========================================
+        // CSS DINÁMICO
+        // ========================================
+        function generateAndApplyCSS() {
+            const identity = currentIdentity;
+            const headerBg = `linear-gradient(135deg, ${identity.gradient[0]}, ${identity.gradient[1]})`;
+            
+            lastCSS = `
+.vfrc-header, [class*="Header"]:not([class*="AssistantInfo"]) { background: ${headerBg} !important; }
+.vfrc-header *, .vfrc-header [class*="Title"], .vfrc-header [class*="Text"] { color: #ffffff !important; }
+.vfrc-assistant-info, [class*="AssistantInfo"], [class*="Welcome"] { color: #0f172a !important; }
+.vfrc-assistant-info *, [class*="AssistantInfo"] *, [class*="Welcome"] * { color: #0f172a !important; }
+.vfrc-chat, .vfrc-chat--dialog, [class*="Dialog"], [class*="ChatContainer"] { background: #ffffff !important; }
+.vfrc-system-response .vfrc-message, [class*="SystemMessage"] { background: #e0e0e0 !important; color: #0f172a !important; border-radius: 12px !important; }
+.vfrc-user-response .vfrc-message, [class*="UserMessage"] { background: ${identity.solidColor} !important; color: ${identity.userBubbleText} !important; border-radius: 12px !important; }
+.vfrc-button, button[class*="Button"], [class*="ActionButton"] { background: ${identity.gradient[0]} !important; color: #ffffff !important; border: none !important; border-radius: 8px !important; }
+.vfrc-chat-input, [class*="InputContainer"], [class*="ChatInput"] { background: #ffffff !important; }
+.vfrc-chat-input textarea, .vfrc-chat-input input, [class*="InputField"] { background: #ffffff !important; color: #0f172a !important; }
+.vfrc-chat-input button, [class*="SendButton"] { background: ${identity.gradient[0]} !important; color: #ffffff !important; }`;
+
+            injectCSS(lastCSS);
+        }
+
+        function injectCSS(css) {
+            const inject = (root) => {
+                if (!root) return;
+                let style = root.querySelector('#vf-custom-css');
+                if (!style) {
+                    style = document.createElement('style');
+                    style.id = 'vf-custom-css';
+                    root.appendChild(style);
+                }
+                style.textContent = css;
+                root.querySelectorAll('*').forEach(el => {
+                    if (el.shadowRoot) inject(el.shadowRoot);
+                });
+            };
+            
+            const container = document.getElementById('chat-container');
+            if (container?.shadowRoot) inject(container.shadowRoot);
+            document.querySelectorAll('*').forEach(el => {
+                if (el.shadowRoot) inject(el.shadowRoot);
+            });
+        }
+
+        // ========================================
+        // FULLSCREEN
+        // ========================================
+        function openFullscreen(imgSrc) {
+            document.getElementById('fullscreenImg').src = imgSrc;
+            document.getElementById('fullscreenModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeFullscreen() {
+            document.getElementById('fullscreenModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeFullscreen();
+        });
+
+        document.getElementById('fullscreenModal').addEventListener('click', (e) => {
+            if (e.target.id === 'fullscreenModal') closeFullscreen();
+        });
+
+        // ========================================
+        // MAKECODE RENDERER
+        // ========================================
+        window.MakeCodeRenderer = {
+            iframe: null,
+            isReady: false,
+            queue: [],
+            callbacks: {},
+            requestId: 0,
+            currentPackages: null,
+
+            init: function() {
+                this.currentPackages = makeCodeExtensions.map(ext => ext.package).join('\n');
+                this.createIframe();
+                this.setupMessageHandler();
+            },
+
+            createIframe: function() {
+                const existing = document.getElementById('makecode-renderer');
+                if (existing) existing.remove();
+
+                const container = document.getElementById('makecode-renderer-container');
+                const iframe = document.createElement('iframe');
+                iframe.id = 'makecode-renderer';
+                iframe.style.cssText = 'position: absolute; left: -9999px; width: 1px; height: 1px;';
+                iframe.sandbox = 'allow-scripts allow-same-origin';
+                iframe.src = `${MAKECODE_URL}--docs?render=1&forcelang=es`;
+                container.appendChild(iframe);
+                this.iframe = iframe;
+                this.isReady = false;
+            },
+
+            setupMessageHandler: function() {
+                window.addEventListener('message', (event) => {
+                    if (!event.origin.includes('makecode.microbit.org')) return;
+                    const data = event.data;
+                    if (data.source !== 'makecode') return;
+
+                    if (data.type === 'renderready') {
+                        console.log('✅ MakeCode listo');
+                        this.isReady = true;
+                        this.processQueue();
+                    } else if (data.type === 'renderblocks') {
+                        const callback = this.callbacks[data.id];
+                        if (callback) {
+                            callback(data);
+                            delete this.callbacks[data.id];
+                        }
+                    }
+                });
+            },
+
+            render: function(code) {
+                return new Promise((resolve, reject) => {
+                    const id = 'render-' + (this.requestId++);
+                    
+                    this.callbacks[id] = (response) => {
+                        if (response.uri) {
+                            resolve({ uri: response.uri, width: response.width, height: response.height });
+                        } else if (response.error) {
+                            reject(new Error(response.error));
+                        } else {
+                            reject(new Error('Error renderizando'));
+                        }
+                    };
+
+                    const options = { snippetMode: true };
+                    if (this.currentPackages) {
+                        options.package = this.currentPackages;
+                    }
+
+                    const message = { type: 'renderblocks', id, code, options };
+
+                    if (this.isReady) {
+                        this.sendMessage(message);
+                    } else {
+                        this.queue.push(message);
+                    }
+
+                    setTimeout(() => {
+                        if (this.callbacks[id]) {
+                            delete this.callbacks[id];
+                            reject(new Error('Timeout'));
+                        }
+                    }, 30000);
+                });
+            },
+
+            sendMessage: function(message) {
+                if (this.iframe?.contentWindow) {
+                    this.iframe.contentWindow.postMessage(message, MAKECODE_URL);
+                }
+            },
+
+            processQueue: function() {
+                while (this.queue.length > 0) {
+                    this.sendMessage(this.queue.shift());
+                }
+            }
+        };
+
+        // ========================================
+        // EXTENSIÓN: RENDER BLOQUES MAKECODE
+        // ========================================
+        const MakeCodeBlocksExtension = {
+            name: 'MakeCodeBlocks',
+            type: 'response',
+            match: ({ trace }) => {
+                return trace.type === 'render_blocks' || 
+                       trace.type === 'ext_render_blocks' || 
+                       trace.type === 'RENDER_MAKECODE_BLOCKS' ||
+                       (trace.payload?.name === 'render_blocks') || 
+                       (trace.payload?.type === 'render_blocks');
+            },
+            render: async ({ trace, element }) => {
+                if (lastCSS) setTimeout(() => injectCSS(lastCSS), 100);
+                
+                const payload = trace.payload || {};
+                let code = payload.code || payload.body?.code || payload.data?.code;
+                
+                if (!code && typeof payload.body === 'string') {
+                    try {
+                        const p = JSON.parse(payload.body);
+                        code = p.code;
+                    } catch(e) {}
+                }
+                
+                if (!code) {
+                    element.innerHTML = '<div style="color:#e53e3e;padding:10px;text-align:center;">No se recibió código</div>';
+                    return;
+                }
+
+                const container = document.createElement('div');
+                container.style.cssText = 'background:#fff;border-radius:12px;padding:12px;margin:8px 0;box-shadow:0 2px 8px rgba(0,0,0,0.1);width:100%;max-width:100%;';
+                container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:20px;color:#666;font-size:14px;">
+                    <div style="width:20px;height:20px;border:3px solid #f3f3f3;border-top:3px solid ${currentIdentity.gradient[0]};border-radius:50%;animation:spin 1s linear infinite;margin-right:10px;"></div>
+                    <span>Generando bloques...</span>
+                </div>`;
+                element.appendChild(container);
+
+                try {
+                    const result = await window.MakeCodeRenderer.render(code);
+                    let isScaleMode = true;
+                    
+                    const imgWrapper = document.createElement('div');
+                    imgWrapper.style.cssText = 'width:100%;overflow:hidden;border-radius:8px;background:#f8f9fa;position:relative;';
+                    
+                    const img = document.createElement('img');
+                    img.src = result.uri;
+                    img.alt = 'Bloques MakeCode';
+                    
+                    const applyStyle = () => {
+                        if (isScaleMode) {
+                            img.style.cssText = 'width:100%!important;max-width:100%!important;height:auto!important;display:block;margin:0 auto;cursor:zoom-in;';
+                            imgWrapper.style.overflowX = 'hidden';
+                        } else {
+                            img.style.cssText = 'width:auto;max-width:none;height:auto;display:block;cursor:grab;';
+                            imgWrapper.style.overflowX = 'auto';
+                        }
+                    };
+                    applyStyle();
+                    
+                    img.onclick = () => {
+                        if (isScaleMode) openFullscreen(result.uri);
+                    };
+                    imgWrapper.appendChild(img);
+                    
+                    const btnBar = document.createElement('div');
+                    btnBar.style.cssText = 'display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;';
+                    const btnStyle = `padding:6px 10px;background:${currentIdentity.gradient[0]};color:white;border:none;border-radius:6px;cursor:pointer;font-size:11px;transition:opacity 0.2s;display:flex;align-items:center;gap:4px;`;
+                    
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.innerHTML = '↔️ Scroll';
+                    toggleBtn.style.cssText = btnStyle;
+                    toggleBtn.onclick = () => {
+                        isScaleMode = !isScaleMode;
+                        applyStyle();
+                        toggleBtn.innerHTML = isScaleMode ? '↔️ Scroll' : '🔲 Escalar';
+                        fullscreenBtn.style.display = isScaleMode ? 'flex' : 'none';
+                    };
+                    
+                    const fullscreenBtn = document.createElement('button');
+                    fullscreenBtn.innerHTML = '🔍 Ampliar';
+                    fullscreenBtn.style.cssText = btnStyle;
+                    fullscreenBtn.onclick = () => openFullscreen(result.uri);
+                    
+                    const copyBtn = document.createElement('button');
+                    copyBtn.innerHTML = '📋 Copiar';
+                    copyBtn.style.cssText = btnStyle;
+                    copyBtn.onclick = () => {
+                        navigator.clipboard.writeText(code).then(() => {
+                            copyBtn.innerHTML = '✅ Copiado';
+                            setTimeout(() => copyBtn.innerHTML = '📋 Copiar', 2000);
+                        });
+                    };
+                    
+                    btnBar.appendChild(toggleBtn);
+                    btnBar.appendChild(fullscreenBtn);
+                    btnBar.appendChild(copyBtn);
+                    
+                    const details = document.createElement('details');
+                    details.style.cssText = 'margin-top:10px;font-size:11px;';
+                    details.innerHTML = `<summary style="cursor:pointer;color:#666;padding:5px 0;">Ver código TypeScript</summary>
+                    <pre style="background:#f5f5f5;padding:10px;border-radius:4px;margin-top:5px;overflow-x:auto;font-size:11px;white-space:pre-wrap;word-break:break-all;">${code}</pre>`;
+                    
+                    container.innerHTML = '';
+                    container.appendChild(imgWrapper);
+                    container.appendChild(btnBar);
+                    container.appendChild(details);
+                } catch (error) {
+                    console.error('Error MakeCode:', error);
+                    container.innerHTML = `<div style="color:#e53e3e;padding:10px;text-align:center;">⚠️ ${error.message}</div>
+                    <pre style="background:#f5f5f5;padding:10px;border-radius:6px;font-size:11px;overflow-x:auto;">${code}</pre>`;
+                }
+            }
+        };
+
+        // ========================================
+        // EXTENSIÓN: GUARDAR INFO DEL ESTUDIANTE
+        // ========================================
+        const SaveStudentInfoExtension = {
+            name: 'SaveStudentInfo',
+            type: 'response',
+            match: ({ trace }) => {
+                return trace.type === 'save_student_info' || 
+                       trace.type === 'ext_save_student_info' ||
+                       trace.type === 'SAVE_STUDENT_INFO' ||
+                       (trace.payload?.name === 'save_student_info') || 
+                       (trace.payload?.type === 'save_student_info');
+            },
+            render: ({ trace, element }) => {
+                const payload = trace.payload || {};
+                let data = payload;
+                
+                if (typeof payload.body === 'string') {
+                    try {
+                        data = JSON.parse(payload.body);
+                    } catch(e) {
+                        data = payload;
+                    }
+                } else if (payload.body) {
+                    data = payload.body;
+                } else if (payload.data) {
+                    data = payload.data;
+                }
+
+                console.log('📥 SaveStudentInfo recibido:', data);
+
+                // Mostrar confirmación en el chat
+                const confirmation = document.createElement('div');
+                confirmation.style.cssText = 'background:#d1fae5;border:1px solid #10b981;border-radius:8px;padding:10px;margin:8px 0;font-size:13px;color:#065f46;';
+                confirmation.innerHTML = `<strong>✅ Información guardada</strong><br>
+                    ${data.student_nickname ? `Apodo: ${data.student_nickname}<br>` : ''}
+                    ${data.student_interests ? `Intereses: ${data.student_interests}` : ''}`;
+                element.appendChild(confirmation);
+            }
+        };
+
+        // ========================================
+        // INICIALIZAR VOICEFLOW
+        // ========================================
+        function initVoiceflow(userId, variables) {
+            const config = {
+                verify: { projectID: VOICEFLOW_PROJECT_ID },
+                url: 'https://general-runtime.voiceflow.com',
+                versionID: 'production',
+                userID: userId,
+                voice: {
+                    url: "https://runtime-api.voiceflow.com"
+                },
+                render: {
+                    mode: 'embedded',
+                    target: document.getElementById('chat-container')
+                },
+                assistant: {
+                    extensions: [MakeCodeBlocksExtension, SaveStudentInfoExtension]
+                },
+                launch: {
+                    event: {
+                        type: 'launch',
+                        payload: variables
+                    }
+                }
+            };
+
+            console.log('⚙️ Config VoiceFlow:', config);
+
+            if (scriptLoaded && window.voiceflow && window.voiceflow.chat) {
+                window.voiceflow.chat.load(config);
+                setTimeout(() => generateAndApplyCSS(), 1500);
+                setTimeout(() => generateAndApplyCSS(), 3000);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = "https://cdn.voiceflow.com/widget-next/bundle.mjs";
+            script.type = "text/javascript";
+            script.onload = function() {
+                scriptLoaded = true;
+                window.voiceflow.chat.load(config);
+                setTimeout(() => generateAndApplyCSS(), 1500);
+                setTimeout(() => generateAndApplyCSS(), 3000);
+            };
+            document.head.appendChild(script);
+        }
+
+        // ========================================
+        // OBSERVER PARA CSS
+        // ========================================
+        function setupCSSObserver() {
+            const container = document.getElementById('chat-container');
+            new MutationObserver(() => {
+                setTimeout(() => {
+                    if (lastCSS) injectCSS(lastCSS);
+                }, 500);
+            }).observe(container, { childList: true, subtree: true });
+        }
+
+        // ========================================
+        // INIT
+        // ========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            initIdentityGrid();
+            window.MakeCodeRenderer.init();
+            setupCSSObserver();
+            userIdInput.focus();
+        });
+    </script>
+</body>
+</html>
